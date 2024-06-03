@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="en">
+   <head>
+      <meta charset="UTF-8">
+      <meta http-equiv="X-UA-Compatible" content="IE=edge">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Global Marital Status Insights</title>
+      <script src="https://d3js.org/d3.v3.min.js"></script>
+      <script src="https://d3js.org/topojson.v1.min.js"></script>
+      <link rel="stylesheet" href="styles.css">
+   </head>
+   <body>
+      <div id="title-container">
+         <h1>Global Marital Status Insights</h1>
+         <p>Click on a country to view marital status data by age group and sex. Click on another country to compare and see detailed graphs.</p>
+      </div>
+      <div id="country-world-container">
+         <svg id="country-worldmap" width="100%" height="800"></svg>
+         <div id="tooltip" class="hidden"></div>
+      </div>
+      <div id="radio-buttons">
+         <input type="radio" id="bySex" name="dataChoice" value="bySex" checked>
+         <label for="bySex">By Sex</label>
+         <input type="radio" id="byAge" name="dataChoice" value="byAge">
+         <label for="byAge">By Age</label>
+      </div>
+      <div id="chart-container" class="chart-container">
+         <div id="tooltip" class="tooltip"></div>
+      </div>
+      <script>
+         var currentChart = null;
+         var selectedCountry = null;
+         var width = document.getElementById('country-world-container').offsetWidth,
+             height = 800;
+         
+         var projection = d3.geo.mercator()
+             .scale(width / 6.5) 
+             .translate([width / 2, height / 1.5]);
+         
+         var path = d3.geo.path()
+             .projection(projection);
+         
+         var svg = d3.select("#country-worldmap")
+             .call(d3.behavior.zoom().on("zoom", zoom))
+             .append("g");
+         
+         var tooltip = d3.select("#tooltip");
+         
+         d3.json("world.json", function(error, world) {
+             if (error) {
+                 console.error('Error loading world.json:', error);
+                 return;
+             }
+         
+             d3.csv("maritalStatus.csv", function(error, data) {
+                 if (error) {
+                     console.error('Error loading maritalStatus.csv:', error);
+                     return;
+                 }
+         
+                 var countries = topojson.feature(world, world.objects.countries1).features;
+         
+                 svg.selectAll(".country")
+                     .data(countries)
+                     .enter().append("path")
+                     .attr("class", "country")
+                     .attr("d", path)
+                     .on("mouseover", function() {
+                         d3.select(this).style("fill", "#A0522D"); // Color on hover
+                     })
+                     .on("mouseout", function() {
+                         d3.select(this).style("fill", "#C2B280"); // Color for countries
+                     })
+                     .on("click", function(d) {
+                         var countryName = d.properties.name;
+                         selectedCountry = countryName; 
+                         svg.selectAll(".country-label").remove();
+         
+                         svg.append("text")
+                             .attr("class", "country-label")
+                             .attr("x", d3.mouse(this)[0])
+                             .attr("y", d3.mouse(this)[1])
+                             .attr("dy", -10)
+                             .style("text-anchor", "middle")
+                             .style("font-size", "10px")
+                             .style("font-weight", "bold")
+                             .style("fill", "green")
+                             .text(countryName);
+         
+                         
+                             var selectedValue = d3.select('input[name="dataChoice"]:checked').node().value;
+															
+                                                            if (selectedValue === "bySex") {
+                                                                                                                  
+                                                                clearChart();
+                                                                createBarChart(countryName);
+                                                            } else if (selectedValue === "byAge") {
+                                                                                                                 
+                                                                clearChart();
+                                                                createPieChartByAge(countryName);
+                                                            }
+                         });
+                     });
+             });
+             d3.selectAll('input[name="dataChoice"]').on("change", function() {
+             if (selectedCountry) {
+                 var selectedValue = this.value;
+                 if (selectedValue === "bySex") {
+                     clearChart();
+                     createBarChart(selectedCountry);
+                 } else if (selectedValue === "byAge") {
+                     clearChart();
+                     createPieChartByAge(selectedCountry);
+                 }
+             }
+            });
+         
+         function zoom() {
+             svg.attr("transform", "translate(" + d3.event.translate + ")scale(" + d3.event.scale + ")");
+         }
+         function clearChart() {
+             d3.select("#chart-container").selectAll("svg").remove();
+         }
+         
+         function createBarChart(countryName){
+             clearChart(); 
+             let countWomen=0;
+             let countMen=0;
+             let maritalStatusCountWomen = {};
+             let maritalStatusCountMen = {};
+         
+             d3.csv("maritalStatus.csv", function(error, data) {
+                 if (error) {
+                     console.error('Error loading maritalStatus.csv:', error);
+                     return;
+                 }
+         
+                 data.forEach(function(d) {
+                     if (d["Country or area"] === countryName) {
+                         if (d["Sex"] === "Men"){
+                             countMen++;
+                             if (!maritalStatusCountMen[d["MaritalStatus"]]) {
+                                 maritalStatusCountMen[d["MaritalStatus"]] = 1;
+                             } else {
+                                 maritalStatusCountMen[d["MaritalStatus"]]++;
+                             }
+                         }else {
+                             countWomen++;
+                             if (!maritalStatusCountWomen[d["MaritalStatus"]]) {
+                                 maritalStatusCountWomen[d["MaritalStatus"]] = 1;
+                             } else {
+                                 maritalStatusCountWomen[d["MaritalStatus"]]++;
+                             }
+                         }
+                     }
+                 });
+         
+                 console.log("Ukupan broj zena za" + countryName + ":", countWomen);
+                 console.log("Ukupan broj muskaraca za " + countryName + ":", countMen);
+                 console.log("Različiti bračni statusi za žene:", maritalStatusCountWomen);
+                 console.log("Različiti bračni statusi za muškarce:", maritalStatusCountMen);
+         
+                 //postotak za svaki bračni status za muškarce
+                 let menStatusPercentage = {};
+                 for (let status in maritalStatusCountMen) {
+                     let percentage = (maritalStatusCountMen[status] / countMen) * 100;
+                     menStatusPercentage[status] = parseFloat(percentage.toFixed(2));
+                 }
+         
+                 //postotak za svaki bračni status za žene
+                 let womenStatusPercentage = {};
+                 for (let status in maritalStatusCountWomen) {
+                     let percentage = (maritalStatusCountWomen[status] / countWomen) * 100;
+                     womenStatusPercentage[status] = parseFloat(percentage.toFixed(2));
+                 }
+                 drawBarChart(countryName, menStatusPercentage, womenStatusPercentage);
+             })
+         }
+         
+         function drawBarChart(countryName, menStatusPercentage, womenStatusPercentage) {
+            const margin = { top: 50, right: 30, bottom: 120, left: 100 };
+            const width = 900 - margin.left - margin.right;
+            const height = 700 - margin.top - margin.bottom;
+
+            const svg = d3.select("#chart-container")
+                .append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform", `translate(${margin.left}, ${margin.top})`);
+
+            const xScale = d3.scale.ordinal()
+                .domain(Object.keys(menStatusPercentage))
+                .rangeRoundBands([0, width], 0.1);
+
+            const yScale = d3.scale.linear()
+                .domain([0, 50])
+                .range([height, 0]);
+
+            const xAxis = d3.svg.axis()
+                .scale(xScale)
+                .orient("bottom");
+
+            const yAxis = d3.svg.axis()
+                .scale(yScale)
+                .orient("left")
+                .ticks(5);
+
+            svg.append("g")
+                .attr("class", "x axis")
+                .attr("transform", `translate(0, ${height})`)
+                .call(xAxis)
+                .selectAll("text")
+                .attr("transform", "rotate(-45)")
+                .style("text-anchor", "end");
+
+            svg.append("g")
+                .attr("class", "y axis")
+                .call(yAxis);
+
+            svg.append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", -50)
+                .attr("x", -height / 2)
+                .attr("dy", "1em")
+                .style("text-anchor", "middle")
+                .text("Percentage of Population");
+
+            const barGroups = svg.selectAll(".bar-group")
+                .data(Object.keys(menStatusPercentage))
+                .enter()
+                .append("g")
+                .attr("class", "bar-group")
+                .attr("transform", d => `translate(${xScale(d)}, 0)`);
+
+            barGroups.append("rect")
+                .attr("class", "bar-men")
+                .attr("width", xScale.rangeBand() / 2)
+                .attr("y", d => yScale(menStatusPercentage[d]))
+                .attr("height", d => height - yScale(menStatusPercentage[d]))
+                .attr("fill", "#8B4513");
+
+            barGroups.append("rect")
+                .attr("class", "bar-women")
+                .attr("width", xScale.rangeBand() / 2)
+                .attr("x", xScale.rangeBand() / 2)
+                .attr("y", d => yScale(womenStatusPercentage[d]))
+                .attr("height", d => height - yScale(womenStatusPercentage[d]))
+                .attr("fill", "#DEB887");
+
+            const tooltip = d3.select("#chart-container").append("div")
+                .attr("class", "tooltip")
+                .style("opacity", 0);
+
+            svg.selectAll(".bar-men")
+                .on("mouseover", function(d) {
+                    const percentage = menStatusPercentage[d];
+                    console.log("Percentage:", percentage);
+                    console.log("PageX:", d3.event.pageX);
+                    console.log("PageY:", d3.event.pageY);
+                    tooltip.transition()
+                        .duration(200)
+                        .style("opacity", .9);
+                    tooltip.html("Percentage: " + percentage + "%")
+                        .style("left", (d3.event.pageX + 5) + "px")
+                        .style("top", (d3.event.pageY - 28) + "px");
+                })
+                .on("mouseout", function(d) {
+                    console.log("Mouse out");
+                    tooltip.transition()
+                        .duration(500)
+                        .style("opacity", 0);
+                });
+
+            svg.selectAll(".bar-women")
+                .on("mouseover", function(d) {
+                    const percentage = womenStatusPercentage[d];
+                    console.log("Percentage:", percentage);
+                    console.log("PageX:", d3.event.pageX);
+                    console.log("PageY:", d3.event.pageY);
+                    tooltip.transition()
+                        .duration(200)
+                        .style("opacity", .9);
+                    tooltip.html("Percentage: " + percentage + "%")
+                        .style("left", (d3.event.pageX + 5) + "px")
+                        .style("top", (d3.event.pageY - 28) + "px");
+                })
+                .on("mouseout", function(d) {
+                    console.log("Mouse out");
+                    tooltip.transition()
+                        .duration(500)
+                        .style("opacity", 0);
+                });
+
+            const legend = svg.selectAll(".legend")
+                .data(["Men", "Women"])
+                .enter()
+                .append("g")
+                .attr("class", "legend")
+                .attr("transform", (d, i) => `translate(0, ${i * 20})`);
+
+            legend.append("rect")
+                .attr("x", width - 18)
+                .attr("width", 18)
+                .attr("height", 18)
+                .style("fill", d => d === "Men" ? "#A0522D" : "#DEB887");
+
+            legend.append("text")
+                .attr("x", width - 24)
+                .attr("y", 9)
+                .attr("dy", ".35em")
+                .style("text-anchor", "end")
+                .text(d => d);
+               
+             svg.append("text")
+                 .attr("class", "chart-title")
+                 .attr("x", width / 2)
+                 .attr("y", -margin.top / 2)
+                 .attr("text-anchor", "middle")
+                 .style("font-size", "18px")
+                 .text("Marital Status Distribution in " + countryName);
+                
+        }
+                
+         //AGE
+         function createPieChartByAge(countryName) {
+            clearChart(); 
+            let countYouth = 0;
+            let countYoungAdults = 0;
+            let countMiddleAged = 0;
+            let countElderly = 0;
+            let countOlderAdults = 0;
+            
+            let maritalStatusCountYouth = {};
+            let maritalStatusCountYoungAdults = {};
+            let maritalStatusCountMiddleAged = {};
+            let maritalStatusCountElderly = {};
+            let maritalStatusCountOlderAdults = {};
+            
+            d3.csv("maritalStatus.csv", function (error, data) {
+                if (error) {
+                    console.error('Error loading maritalStatus.csv:', error);
+                    return;
+                }
+                
+                data.forEach(function (d) {
+                    if (d["Country or area"] === countryName) {
+                        if (d["AgeGroup"] === "[10-25]") {
+                            countYouth++;
+                            if (!maritalStatusCountYouth[d["MaritalStatus"]]) {
+                                maritalStatusCountYouth[d["MaritalStatus"]] = 1;
+                            } else {
+                                maritalStatusCountYouth[d["MaritalStatus"]]++;
+                            }
+                        } else if (d["AgeGroup"] === "[26-39]") {
+                            countYoungAdults++;
+                            if (!maritalStatusCountYoungAdults[d["MaritalStatus"]]) {
+                                maritalStatusCountYoungAdults[d["MaritalStatus"]] = 1;
+                            } else {
+                                maritalStatusCountYoungAdults[d["MaritalStatus"]]++;
+                            }
+                        } else if (d["AgeGroup"] === "[40-59]") {
+                            countMiddleAged++;
+                            if (!maritalStatusCountMiddleAged[d["MaritalStatus"]]) {
+                                maritalStatusCountMiddleAged[d["MaritalStatus"]] = 1;
+                            } else {
+                                maritalStatusCountMiddleAged[d["MaritalStatus"]]++;
+                            }
+                        } else if (d["AgeGroup"] === "[60-74]") {
+                            countElderly++;
+                            if (!maritalStatusCountElderly[d["MaritalStatus"]]) {
+                                maritalStatusCountElderly[d["MaritalStatus"]] = 1;
+                            } else {
+                                maritalStatusCountElderly[d["MaritalStatus"]]++;
+                            }
+                        } else if (d["AgeGroup"] === "[75+]") {
+                            countOlderAdults++;
+                            if (!maritalStatusCountOlderAdults[d["MaritalStatus"]]) {
+                                maritalStatusCountOlderAdults[d["MaritalStatus"]] = 1;
+                            } else {
+                                maritalStatusCountOlderAdults[d["MaritalStatus"]]++;
+                            }
+                        }
+                    }
+                });
+                
+                calculatePercentages(countryName, countYouth, countYoungAdults, countMiddleAged, countElderly, countOlderAdults, maritalStatusCountYouth, maritalStatusCountYoungAdults, maritalStatusCountMiddleAged, maritalStatusCountElderly, maritalStatusCountOlderAdults);
+            });
+        }
+
+         
+         function calculatePercentages(countryName, countYouth, countYoungAdults, countMiddleAged, countElderly, countOlderAdults, maritalStatusCountYouth, maritalStatusCountYoungAdults, maritalStatusCountMiddleAged, maritalStatusCountElderly, maritalStatusCountOlderAdults) {
+             function calculatePercentage(count, total) {
+                 return (count / total) * 100;
+             }
+             
+             let totalYouth = countYouth;
+             let totalYoungAdults = countYoungAdults;
+             let totalMiddleAged = countMiddleAged;
+             let totalElderly = countElderly;
+             let totalOlderAdults = countOlderAdults;
+             
+             Object.keys(maritalStatusCountYouth).forEach(function (status) {
+                 maritalStatusCountYouth[status] = calculatePercentage(maritalStatusCountYouth[status], totalYouth);
+             });
+             
+             Object.keys(maritalStatusCountYoungAdults).forEach(function (status) {
+                 maritalStatusCountYoungAdults[status] = calculatePercentage(maritalStatusCountYoungAdults[status], totalYoungAdults);
+             });
+             
+             Object.keys(maritalStatusCountMiddleAged).forEach(function (status) {
+                 maritalStatusCountMiddleAged[status] = calculatePercentage(maritalStatusCountMiddleAged[status], totalMiddleAged);
+             });
+             
+             Object.keys(maritalStatusCountElderly).forEach(function (status) {
+                 maritalStatusCountElderly[status] = calculatePercentage(maritalStatusCountElderly[status], totalElderly);
+             });
+             
+             Object.keys(maritalStatusCountOlderAdults).forEach(function (status) {
+                 maritalStatusCountOlderAdults[status] = calculatePercentage(maritalStatusCountOlderAdults[status], totalOlderAdults);
+             });
+             
+
+             drawPieChartByMaritalStatus(countryName, maritalStatusCountYouth, maritalStatusCountYoungAdults, maritalStatusCountMiddleAged, maritalStatusCountElderly, maritalStatusCountOlderAdults);
+        }
+    function drawPieChartByMaritalStatus(countryName, maritalStatusCountsYouth, maritalStatusCountsYoungAdults, maritalStatusCountsMiddleAged, maritalStatusCountsElderly, maritalStatusCountsOlderAdults) {
+        const margin = { top: 50, right: 30, bottom: 120, left: 100 };
+        const width = 1200 - margin.left - margin.right;
+        const height = 900 - margin.top - margin.bottom;
+        const radius = Math.min(width, height) / 8;
+        const arc = d3.svg.arc()
+            .outerRadius(radius - 10)
+            .innerRadius(0);
+
+        const color = d3.scale.ordinal()
+            .range(["#8B4513", "#A0522D", "#CD853F", "#D2B48C", "#DEB887"]);
+
+        const svg = d3.select("#chart-container")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", `translate(${margin.left}, ${margin.top})`);
+
+        const pie = d3.layout.pie()
+            .sort(null)
+            .value(d => d.value);
+
+        const ageGroups = ["[10-25]", "[26-39]", "[40-59]", "[60-74]", "[75+]"];
+        const maritalStatuses = Object.keys(maritalStatusCountsYouth);
+        const numCharts = maritalStatuses.length;
+
+
+        const numRows = Math.ceil(numCharts / 3);
+        const numCols = 3;
+
+        maritalStatuses.forEach((status, index) => {
+            const rowIndex = Math.floor(index / numCols);
+            const colIndex = index % numCols;
+
+            const xOffset = colIndex * (width / numCols) + radius + (colIndex * 20); 
+            const yOffset = rowIndex * (height / numRows) + radius + (rowIndex * 20); 
+
+            const maritalStatusData = [
+                { key: "[10-25]", value: maritalStatusCountsYouth[status] || 0 },
+                { key: "[26-39]", value: maritalStatusCountsYoungAdults[status] || 0 },
+                { key: "[40-59]", value: maritalStatusCountsMiddleAged[status] || 0 },
+                { key: "[60-74]", value: maritalStatusCountsElderly[status] || 0 },
+                { key: "[75+]", value: maritalStatusCountsOlderAdults[status] || 0 }
+            ];
+        //makni value 0
+        const filteredData = maritalStatusData.filter(d => d.value !== 0);
+            const g = svg.append("g")
+                .attr("transform", `translate(${xOffset}, ${yOffset})`);
+
+            const arcs = g.selectAll(".arc")
+                .data(pie(filteredData))
+                .enter().append("g")
+                .attr("class", "arc");
+
+            arcs.append("path")
+                .attr("d", arc)
+                .style("fill", d => color(d.data.key));
+
+            arcs.append("text")
+                .attr("transform", d => `translate(${arc.centroid(d)})`)
+                .attr("dy", ".35em")
+                .style("text-anchor", "middle")
+                .text(d => d.data.key)
+                .style("font-size", "10px");
+
+            g.append("text")
+                .attr("x", 0)
+                .attr("y", -radius - 10)
+                .attr("text-anchor", "middle")
+                .style("font-size", "12px")
+                .style("text-decoration", "underline")
+                .text(status);
+        });
+
+
+            const legend = svg.append("g")
+                .attr("class", "legend")
+                .attr("transform", `translate(${width - margin.right - 50}, 20)`);
+
+            legend.append("text")
+                .text("Age Groups:")
+                .attr("x", 0)
+                .attr("y", -10)
+                .style("font-weight", "bold");
+
+            ageGroups.forEach((ageGroup, i) => {
+                legend.append("rect")
+                    .attr("x", 0)
+                    .attr("y", i * 20)
+                    .attr("width", 15)
+                    .attr("height", 15)
+                    .attr("fill", color(ageGroup));
+
+                legend.append("text")
+                    .text(ageGroup)
+                    .attr("x", 20)
+                    .attr("y", i * 20 + 12)
+                    .style("font-size", "8px"); 
+            });
+            // Postavljanje veličine fonta za naslov
+            svg.append("text")
+                 .attr("class", "chart-title")
+                 .attr("x", width / 2)
+                 .attr("y", -margin.top / 2 - 10) 
+                 .attr("text-anchor", "middle")
+                 .style("font-size", "15px")
+                 .text("Marital Status Distribution in " + countryName + " by Age groups");               
+           
+
+            const tooltip = d3.select("body").append("div")
+                .attr("class", "tooltip")
+                .style("opacity", 0);
+
+                svg.selectAll("path")
+                .on("mouseover", function (d) {
+                    const percentage = d.data.value.toFixed(2); 
+                    tooltip.transition()
+                        .duration(200)
+                        .style("opacity", .9);
+                    tooltip.html(percentage + "%") 
+                        .style("left", (d3.event.pageX) + "px")
+                        .style("top", (d3.event.pageY - 28) + "px");
+                })
+                .on("mouseout", function () {
+                    tooltip.transition()
+                        .duration(500)
+                        .style("opacity", 0);
+                });
+        }
+    </script>
+   </body>
+</html>
